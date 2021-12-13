@@ -1,0 +1,45 @@
+[Unit]
+Description=Spool TTN MQTT to Postgres metricsdb
+Documentation=https://github.com/gsauthof/lorawan
+
+After=network.target postgresql.service
+
+[Service]
+User=metricsdb
+Group=metricsdb
+Type=notify
+ExecStart=/usr/local/bin/ttnmqtt2pg --systemd -c /usr/local/etc/ttnmqtt2pq.ini
+
+# Restart the service if it exited cleanly/dirty/because of a signal/timeout
+Restart=always
+
+# Sleep X seconds between a Restart= triggered restart
+RestartSec=119
+
+
+# NB: On a SELinux enabled system we are running this service
+#     unconfined since to domain transition is defined
+#     for the executable's default label.
+#     However, below systemd settings sandbox the process.
+
+# no new privileges via exec setuid etc.
+NoNewPrivileges=true
+# Create private /dev with only some pseudo devices like
+# /dev/{null,zero,random,urandom}
+PrivateDevices=true
+# Need shared /tmp for Postgres unix-domain-socket
+#PrivateTmp=true
+# Mount all system directories read-only except for /dev|/proc|/sys|/tmp
+# NOTE: Not available on CentOS 7 - but on e.g. Fedora 29
+ProtectSystem=strict
+# Make /home|/root|/run/user inaccessible/empty
+ProtectHome=true
+
+# does work:
+#SystemCallFilter=@system-service
+# more minimal set:
+SystemCallFilter=@basic-io @io-event @file-system @network-io @signal mprotect sysinfo ioctl uname arch_prctl prctl
+
+
+[Install]
+WantedBy=multi-user.target

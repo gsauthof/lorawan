@@ -1,0 +1,40 @@
+
+- name: create ttnmqtt2pg service
+  copy:
+      src: ttnmqtt2pg.service
+      dest: /etc/systemd/system/ttnmqtt2pg.service
+      owner: root
+      group: root
+      mode: '0644'
+  notify: restart ttnmqtt2pg
+  tags: [ttnmqtt2pg]
+
+- name: enable ttnmqtt2pg service
+  systemd:
+      daemon_reload: yes
+      name: ttnmqtt2pg
+      enabled: yes
+  tags: [ttnmqtt2pg]
+
+
+- name: copy ttnmqtt2pg
+  copy:
+      src: ttnmqtt2pg.py
+      dest: /usr/local/bin/ttnmqtt2pg
+      owner: root
+      group: root
+      mode: '0755'
+  notify: restart ttnmqtt2pg
+  tags: [ttnmqtt2pg]
+
+
+- name: copy ttnmqtt2pg.ini
+  template:
+      src: ttnmqtt2pg.ini.j2
+      dest: /usr/local/etc/ttnmqtt2pg
+      owner: root
+      group: metricsdb
+      mode: '0640'
+  notify: restart ttnmqtt2pg
+  tags: [ttnmqtt2pg]
+

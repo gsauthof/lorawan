@@ -1,0 +1,8 @@
+
+- name: metricsdb
+  hosts: all
+
+  roles:
+      - metricsdb
+      - grafana
+      - ttnmqtt2pg

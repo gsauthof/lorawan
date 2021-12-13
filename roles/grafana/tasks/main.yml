@@ -1,0 +1,76 @@
+
+- name: install grafana etc
+  package:
+      name: grafana
+  tags: [grafana]
+
+
+- name: check grafana db
+  stat:
+      path: /var/lib/grafana/grafana.db
+  register: grafana_db
+  changed_when: false
+  tags: [grafana]
+
+- name: set grafana admin password
+  ini_file:
+      path: /etc/grafana/grafana.ini
+      section: security
+      option: admin_password
+      value: '{{ grafana_admin_pw }}'
+      mode: '0640'
+      owner: root
+      group: grafana
+  when: 'grafana_db.stat.size == 0'
+  tags: [grafana]
+
+
+- name: start and enable grafana
+  systemd:
+      state: started
+      enabled: yes
+      name: grafana-server
+  tags: [grafana]
+
+- name: create postgres datasource
+  grafana_datasource:
+    name: metricsdb
+    grafana_url: 'http://localhost:3000'
+    grafana_user: admin
+    grafana_password: '{{ grafana_admin_pw }}'
+    org_id: 1
+    ds_type: postgres
+    ds_url: '/var/run/postgresql'
+    database: metricsdb
+    user: 'grafana'
+    sslmode: 'disable'
+    # XXX or pass via additional_json_data
+    time_interval: '1m'
+# not supported by ansible 2.9 ...
+#    additional_json_data:
+#        postgresVersion: 13
+#        timescaledb: false
+#        timeInterval: '1m'
+  tags: [grafana, datasource]
+
+- name: protect grafana admin password
+  ini_file:
+      path: /etc/grafana/grafana.ini
+      section: security
+      option: admin_password
+      value: admin
+      mode: '0600'
+      owner: root
+      group: grafana
+  when: 'grafana_db.stat.size == 0'
+  tags: [grafana]
+
+
+- name: open grafana port
+  firewalld:
+      service: grafana
+      state: enabled
+      permanent: yes
+      immediate: yes
+  tags: [grafana, grafanaport]
+

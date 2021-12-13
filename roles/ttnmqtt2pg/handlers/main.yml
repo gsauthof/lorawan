@@ -1,0 +1,5 @@
+
+- name: restart ttnmqtt2pg
+  systemd:
+      state: restarted
+      name: ttnmqtt2pg

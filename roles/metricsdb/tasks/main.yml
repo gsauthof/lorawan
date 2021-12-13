@@ -1,0 +1,204 @@
+
+
+- name: install postgres etc
+  package:
+      name:
+          - postgis
+          - postgresql
+          - postgresql-server
+          - python3-configargparse
+          - python3-paho-mqtt
+          - python3-psycopg2
+          - python3-sqlalchemy
+          - python3-systemd
+          - tmpwatch
+  tags: [postgres]
+
+
+- name: disable copy-on-write for postgres dirs
+  file:
+      path: '/var/lib/pgsql/{{ item }}'
+      attr: +C
+  loop:
+      - data
+      - backups
+  tags: [postgres, postgres_cow]
+
+
+- name: initialize postgres
+  command:
+      creates: /var/lib/pgsql/data/PG_VERSION
+      cmd: '/usr/bin/postgresql-setup --initdb'
+  environment:
+      PGSETUP_INITDB_OPTIONS: '--encoding=UTF8 --locale=C --text-search-config=english'
+  tags: [postgres]
+
+
+- name: start postgres
+  systemd:
+      state: started
+      name: postgresql
+  tags: [postgres]
+
+
+- name: enable postgres
+  systemd:
+      enabled: yes
+      name: postgresql
+  tags: [postgres]
+
+
+- name: add clean up old log postgres log files cron job
+  cron:
+      name: pg-log-watch
+      # without TZ= tmpwatch tries to open /etc/localtime for each file
+      # probably because it calls localtime()
+      job: 'TZ= tmpwatch --mtime 31d --nodirs /var/lib/pgsql/data/log'
+      hour: '0'
+      minute: '23'
+      cron_file: postgresql
+      # otherwise, we get dac_override SELinux AVCs because root
+      # can only write (unlink) in the postgres directory by overriding
+      # the standard permission check - which isn't granted
+      # by the tmpwatch policy
+      user: postgres
+  tags: [postgres, pglogrotate]
+
+
+- name: create metricsdb user
+  user:
+      name: metricsdb
+      system: yes
+      shell: /sbin/nologin
+  tags: [metricsdb]
+
+- name: create postgres metricsdb user
+  postgresql_user:
+      name: metricsdb
+      role_attr_flags: NOCREATEDB,NOCREATEROLE,NOSUPERUSER
+  become: yes
+  become_user: postgres
+  tags: [metricsdb, pguser]
+
+- name: create postgres grafana user
+  postgresql_user:
+      name: grafana
+      role_attr_flags: NOCREATEDB,NOCREATEROLE,NOSUPERUSER
+  become: yes
+  become_user: postgres
+  tags: [metricsdb, pguser]
+
+- name: create main postgres user
+  postgresql_user:
+      name: '{{ main_user }}'
+      role_attr_flags: CREATEDB,NOCREATEROLE,NOSUPERUSER
+  become: yes
+  become_user: postgres
+  tags: [metricsdb, pguser]
+
+- name: create metricsdb
+  postgresql_db:
+      name: metricsdb
+      owner: "{{ main_user }}"
+  become: yes
+  become_user: postgres
+  tags: [metricsdb]
+
+
+- name: add default privileges for metricsdb user
+  postgresql_privs:
+      db: metricsdb
+      schema: public
+      type: default_privs
+      objs: TABLES
+      privs: SELECT,INSERT,UPDATE,DELETE
+      target_roles: '{{ main_user }}'
+      role: metricsdb
+  become: yes
+  become_user: postgres
+  tags: [metricsdb, grant]
+
+- name: add default privileges for grafana user
+  postgresql_privs:
+      db: metricsdb
+      schema: public
+      type: default_privs
+      objs: TABLES
+      privs: SELECT
+      target_roles: '{{ main_user }}'
+      role: manpaged
+  become: yes
+  become_user: postgres
+  tags: [metricsdb, grant]
+
+# in case schema already has tables!
+- name: grant existing tables to grafana
+  postgresql_privs:
+      db: metricsdb
+      schema: public
+      type: table
+      objs: ALL_IN_SCHEMA
+      privs: SELECT
+      role: grafana
+  become: yes
+  become_user: postgres
+  tags: [metricsdb, grant, grantrep]
+
+
+- name: enable postgis extension
+  postgresql_ext:
+      name: postgis
+      db: metricsdb
+  become: yes
+  become_user: postgres
+  tags: [metricsdb, postgis]
+
+
+- name: copy metricdb schema
+  copy:
+      src: schema.sql
+      dest: /usr/local/etc/metricsdb.sql
+      owner: root
+      group: root
+      mode: '0644'
+  tags: [metricsdb, table]
+
+- name: load metricsdb schema
+  postgresql_query:
+      db: metricsdb
+      login_user: '{{ main_user }}'
+      path_to_script: /usr/local/etc/metricsdb.sql
+  become: yes
+  become_user: '{{ main_user }}'
+  tags: [metricsdb, table]
+
+
+- name: copy add partition script
+  copy:
+      src: add_metrics_partition.sh
+      dest: /usr/local/bin/add_metrics_partition
+      owner: root
+      group: root
+      mode: '0755'
+  register: add_part_script
+  tags: [metricsdb, partition]
+
+- name: add initial partition
+  shell: /usr/local/bin/add_metrics_partition
+  become: yes
+  become_user: '{{ main_user }}'
+  when: add_part_script.changed
+  tags: [metricsdb, partition]
+
+- name: setup dnf cron job
+  cron:
+      name: metricsdb
+      job: '/usr/local/bin/add_metrics_partition'
+      hour: '15'
+      minute: '23'
+      cron_file: metricsdb
+      user: '{{ main_user }}'
+  tags: [metricsdb, partition]
+
+
+

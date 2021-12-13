@@ -1,0 +1,6 @@
+main_user: juser
+
+grafana_admin_pw: einsfueralles
+
+ttn_user: 'myapp@ttn'
+ttn_password: 'abc.api.key.etc.xyz'
