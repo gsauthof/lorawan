@@ -83,7 +83,7 @@ Show the top 10 measurements of a certain device:
         pl->'temperature' as temperature
         from metrics
         where device_id = 'iaq-01'
-        order by time desc limit 10;
+        order by time, device_id desc limit 10;
 
 The Grafana UI has some limited support for building queries, an end result
 for a time series graph panel might look like this:
@@ -96,7 +96,7 @@ for a time series graph panel might look like this:
     WHERE
       $__timeFilter("time")
     GROUP BY 1, device_id
-    ORDER BY 1
+    ORDER BY 1, device_id
 
 If you have heterogeneous devices where the - say - humidity field
 is named differently, just copy the query and rename it:
@@ -109,7 +109,15 @@ is named differently, just copy the query and rename it:
     WHERE
       $__timeFilter("time")
     GROUP BY 1, device_id
-    ORDER BY 1
+    ORDER BY 1, device_id
+
+
+NB: Ordering also by `device_id` is important because otherwise
+the coloring in the Grafana panel might change between each
+refresh (because it chooses colors on a first come first server
+basis). Unfortunately, the Grafana Query builder just adds `order
+by 1` such that one has to switch to editing raw SQL statements
+to fix it.
 
 
 ## Related Work
