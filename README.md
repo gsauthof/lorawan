@@ -86,7 +86,8 @@ Show the top 10 measurements of a certain device:
         order by time, device_id desc limit 10;
 
 The Grafana UI has some limited support for building queries, an end result
-for a time series graph panel might look like this:
+for a time series graph panel might look like this (modulo the
+order-by clause, see below):
 
     SELECT
       $__timeGroupAlias("time",$__interval),
@@ -98,12 +99,12 @@ for a time series graph panel might look like this:
     GROUP BY 1, device_id
     ORDER BY 1, device_id
 
-If you have heterogeneous devices where the - say - humidity field
-is named differently, just copy the query and rename it:
+If you have heterogeneous devices where the - say - temperature field
+is named differently, just coalesce on the fields:
 
     SELECT
       $__timeGroupAlias("time",$__interval),
-      avg((pl->'Hum_SHT')::float) AS "humidity",
+      avg(coalesce(pl->'TempC_SHT', pl->'temperature')::float) AS "temp",
       device_id
     FROM metrics
     WHERE
