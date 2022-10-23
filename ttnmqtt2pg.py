@@ -115,10 +115,14 @@ def extract_data(d):
         h[i] = m.get(i)
     s = u['settings']
     for i in ('coding_rate', 'frequency'):
-        h[i] = s[i]
+        v = s.get(i)
+        if v is not None:
+            h[i] = v
     l = s['data_rate']['lora']
-    for i in ('bandwidth', 'spreading_factor'):
-        h[i] = l[i]
+    for i in ('bandwidth', 'spreading_factor', 'coding_rate'):
+        v = l.get(i)
+        if v is not None:
+            h[i] = v
     g = m['location']
     for i in ('altitude', 'latitude', 'longitude'):
         h[i] = g[i]
