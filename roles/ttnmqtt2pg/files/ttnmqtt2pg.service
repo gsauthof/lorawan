@@ -38,7 +38,9 @@ ProtectHome=true
 # does work:
 #SystemCallFilter=@system-service
 # more minimal set:
-SystemCallFilter=@basic-io @io-event @file-system @network-io @signal mprotect sysinfo ioctl uname arch_prctl prctl
+SystemCallFilter=@basic-io @io-event @file-system @network-io @signal mprotect sysinfo ioctl uname arch_prctl prctl    pipe2 vfork wait4
+# NB: `pipe2 vfork wait4` is required to work around a regression in SQLalchemy 1.4.44
+#     cf. https://github.com/sqlalchemy/sqlalchemy/issues/8995
 
 
 [Install]
