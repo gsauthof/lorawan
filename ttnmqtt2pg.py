@@ -102,10 +102,10 @@ def extract_data(d):
     h = {}
     h['device_id'] = d['end_device_ids']['device_id']
     u = d['uplink_message']
-    for i in ('decoded_payload', 'f_port', 'consumed_airtime'):
-        h[i] = u[i]
-    for i in ('f_cnt', 'frm_payload', ):
-        h[i] = u.get(i, '')
+    h['consumed_airtime'] = u['consumed_airtime']
+    for i in ( 'f_port', 'f_cnt', 'decoded_payload' ):
+        h[i] = u.get(i)
+    h['frm_payload'] = u.get('frm_payload', '')
     # XXX how to deal with multiple receiving gateways?
     m = u['rx_metadata'][0]
     h['gateway_id'] = m['gateway_ids']['gateway_id']
@@ -131,27 +131,30 @@ def extract_data(d):
 
 
 def store(d):
-    if dry_run:
-        transaction = db.begin()
-
     location    = f'POINTZ({d["longitude"]} {d["latitude"]} {d["altitude"]})'
     airtime_us  = d['consumed_airtime']
     airtime_us  = int(float(airtime_us[:airtime_us.rindex('s')]) * 10**6)
     frm_payload = base64.decodebytes(d['frm_payload'].encode('ascii'))
     device_id   = device_id_re.sub(device_repl, d['device_id'])
 
-    db.execute(metrics_ins, time=d['time'],
-            device_id=device_id, location=location,
-            registry=(d['location_src'] == 'SOURCE_REGISTRY'),
-            gateway_id=d['gateway_id'],
-            sf=d['spreading_factor'], bw=d['bandwidth'], rssi=d['rssi'],
-            snr=d['snr'], c_rate=d['coding_rate'], airtime_us=airtime_us,
-            freq=d['frequency'], chan_idx=d['channel_index'],
-            chan_rssi=d['channel_rssi'], f_cnt=d['f_cnt'], f_port=d['f_port'],
-            frm_payload=frm_payload, pl=d['decoded_payload'])
+    db.execute(metrics_ins, {
+            'time': d['time'],
+            'device_id': device_id, 'location': location,
+            'registry': (d['location_src'] == 'SOURCE_REGISTRY'),
+            'gateway_id': d['gateway_id'],
+            'sf': d['spreading_factor'], 'bw': d['bandwidth'], 'rssi': d['rssi'],
+            'snr': d['snr'], 'c_rate': d['coding_rate'], 'airtime_us': airtime_us,
+            'freq': d['frequency'], 'chan_idx': d['channel_index'],
+            'chan_rssi': d['channel_rssi'], 'f_cnt': d['f_cnt'], 'f_port': d['f_port'],
+            'frm_payload': frm_payload, 'pl': d['decoded_payload']
+            })
 
+    # i.e. 'commit [or rollback] as you go' style ...
     if dry_run:
-        transaction.rollback()
+        db.rollback()
+    else:
+        db.commit()
+
 
 def setup_logging(debug):
     log_format      = '%(asctime)s - %(levelname)-8s - %(message)s [%(name)s]'
@@ -181,18 +184,22 @@ def mainP():
 
     setup_logging(args.debug)
 
-    engine = sqlalchemy.create_engine(args.db, echo=args.echo)
+    # future=True => Unlock SQLAlchemy 2.0 features in order to silence deprecation
+    #                warning about removal of implicit auto-commit, executing text statements,
+    #                and similar.
+    #                Also, this enables 'commit as you go' style code already in SQLAlchemy 1.4.
+    # this argument can be removed again with SQLAlchemy >= 2
+    engine = sqlalchemy.create_engine(args.db, echo=args.echo, future=True)
     global db
     db   = engine.connect()
 
     # it's ok if we lose the last few inserts in case of a server crash
     # NB: fsync after each insert doesn't scale with a lot of events
     # cf. https://www.postgresql.org/docs/13/wal-async-commit.html
-    db.execute('SET synchronous_commit = off')
+    db.execute(sqlalchemy.text('SET synchronous_commit = off'))
 
     meta = sqlalchemy.MetaData()
-    metrics_table = sqlalchemy.Table('metrics', meta, autoload=True,
-            autoload_with=engine)
+    metrics_table = sqlalchemy.Table('metrics', meta, autoload_with=engine)
     global metrics_ins
     metrics_ins = metrics_table.insert()
 
