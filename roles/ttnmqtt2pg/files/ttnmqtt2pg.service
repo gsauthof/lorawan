@@ -18,7 +18,7 @@ RestartSec=119
 
 
 # NB: On a SELinux enabled system we are running this service
-#     unconfined since to domain transition is defined
+#     unconfined since no domain transition is defined
 #     for the executable's default label.
 #     However, below systemd settings sandbox the process.
 
