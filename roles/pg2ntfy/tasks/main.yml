@@ -1,4 +1,15 @@
 
+
+- name: install pg2ntfy dependencies
+  package:
+      name:
+          - python3-configargparse
+          - python3-httpx
+          - python3-psycopg2
+          - python3-systemd
+      state: latest
+  tags: [pg2ntfy]
+
 - name: create pg2ntfy service
   copy:
       src: pg2ntfy.service

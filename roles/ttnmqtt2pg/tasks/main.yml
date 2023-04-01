@@ -1,4 +1,15 @@
 
+- name: install pg2ntfy dependencies
+  package:
+      name:
+          - python3-configargparse
+          - python3-paho-mqtt
+          - python3-psycopg2
+          - python3-sqlalchemy
+          - python3-systemd
+      state: latest
+  tags: [ttnmqtt2pg]
+
 - name: create ttnmqtt2pg service
   copy:
       src: ttnmqtt2pg.service
