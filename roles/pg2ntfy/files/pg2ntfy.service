@@ -63,6 +63,8 @@ SystemCallFilter=prctl
 
 SystemCallFilter=~@ipc
 
+# python-psycopg3
+SystemCallFilter=pipe2 memfd_create
 
 RemoveIPC=true
 # assign the empty set

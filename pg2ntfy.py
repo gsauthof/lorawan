@@ -9,8 +9,7 @@
 
 import configargparse
 import httpx
-import psycopg2
-import select
+import psycopg
 import signal
 import sys
 import systemd.daemon
@@ -46,23 +45,16 @@ def mainP():
     signal.signal(signal.SIGTERM, on_sigterm)
     args = parse_args()
 
-    db = psycopg2.connect(args.db)
-    db.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-    c = db.cursor()
+    db = psycopg.connect(args.db, autocommit=True)
 
-    c.execute(f'LISTEN {args.channel}')
+    db.execute(f'LISTEN {args.channel}')
 
     if args.systemd:
         systemd.daemon.notify('READY=1')
 
-    p = select.poll()
-    p.register(db, select.POLLIN)
-
-    while p.poll():
-        db.poll()
-        while db.notifies:
-            x = db.notifies.pop(0)
-            httpx.post(f'https://ntfy.sh/{args.topic}', content=x.payload)
+    xs = db.notifies()
+    for x in xs:
+        httpx.post(f'https://ntfy.sh/{args.topic}', content=x.payload)
 
 
 def main():
