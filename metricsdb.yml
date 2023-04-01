@@ -6,3 +6,4 @@
       - metricsdb
       - grafana
       - ttnmqtt2pg
+      - pg2ntfy

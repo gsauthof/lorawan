@@ -1,0 +1,5 @@
+
+- name: restart pg2ntfy
+  systemd:
+      state: restarted
+      name: pg2ntfy

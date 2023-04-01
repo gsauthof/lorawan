@@ -31,7 +31,7 @@
 - name: copy ttnmqtt2pg.ini
   template:
       src: ttnmqtt2pg.ini.j2
-      dest: /usr/local/etc/ttnmqtt2pg
+      dest: /usr/local/etc/ttnmqtt2pg.ini
       owner: root
       group: metricsdb
       mode: '0640'

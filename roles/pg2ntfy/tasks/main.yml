@@ -1,0 +1,40 @@
+
+- name: create pg2ntfy service
+  copy:
+      src: pg2ntfy.service
+      dest: /etc/systemd/system/pg2ntfy.service
+      owner: root
+      group: root
+      mode: '0644'
+  notify: restart pg2ntfy
+  tags: [pg2ntfy]
+
+- name: enable pg2ntfy service
+  systemd:
+      daemon_reload: yes
+      name: pg2ntfy
+      enabled: yes
+  tags: [pg2ntfy]
+
+
+- name: copy pg2ntfy
+  copy:
+      src: pg2ntfy.py
+      dest: /usr/local/bin/pg2ntfy
+      owner: root
+      group: root
+      mode: '0755'
+  notify: restart pg2ntfy
+  tags: [pg2ntfy]
+
+
+- name: copy pg2ntfy.ini
+  template:
+      src: pg2ntfy.ini.j2
+      dest: /usr/local/etc/pg2ntfy.ini
+      owner: root
+      group: metricsdb
+      mode: '0640'
+  notify: restart pg2ntfy
+  tags: [pg2ntfy]
+

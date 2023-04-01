@@ -1,0 +1,90 @@
+[Unit]
+Description=Forward Postgresql Notifications to ntfy
+Documentation=https://github.com/gsauthof/lorawan
+
+After=network.target postgresql.service
+
+[Service]
+User=metricsdb
+Group=metricsdb
+Type=notify
+EnvironmentFile=-/etc/sysconfig/pg2ntfy
+ExecStart=/usr/local/bin/pg2ntfy --systemd -c /usr/local/etc/pg2ntfy.ini $flags
+
+# Restart the service if it exited cleanly/dirty/because of a signal/timeout
+Restart=always
+
+# Sleep X seconds between a Restart= triggered restart
+RestartSec=119
+
+
+# NB: On a SELinux enabled system we are running this service
+#     unconfined since no domain transition is defined
+#     for the executable's default label.
+#     However, below systemd settings sandbox the process.
+
+# no new privileges via exec setuid etc.
+NoNewPrivileges=true
+
+# We need access to the HID device ...
+#PrivateDevices=true
+DeviceAllow=char-usb_device
+
+# Need shared /tmp for Postgres unix-domain-socket
+#PrivateTmp=true
+# Mount all system directories read-only except for /dev|/proc|/sys|/tmp
+# NOTE: Not available on CentOS 7 - but on e.g. Fedora 29
+ProtectSystem=strict
+# Make /home|/root|/run/user inaccessible/empty
+ProtectHome=true
+
+# Can't disable the clock because this breaks opening the HID device?!?
+#ProtectClock=true
+ProtectHostname=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+# disallow reading/writing kernel ring buffer
+ProtectKernelLogs=true
+# disallow modifying control groups
+ProtectControlGroups=true
+
+ProtectProc=invisible
+# many services need to read _some_thing from /proc/ but this one doesn't
+ProcSubset=pid
+
+SystemCallArchitectures=native
+# does work:
+SystemCallFilter=@system-service
+# deny-list, i.e. remove some of the @system-service elements
+SystemCallFilter=~@keyring @memlock @privileged @resources @setuid userfaultfd
+
+# python calls prctl
+SystemCallFilter=prctl
+
+SystemCallFilter=~@ipc
+
+
+RemoveIPC=true
+# assign the empty set
+CapabilityBoundingSet=
+
+# we need a UDS to Postgres and IP to ntfy ...
+#IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+RestrictNamespaces=true
+# kind of implied by User=/NoNewPrivileges= setting
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# we need to contact ntfy ...
+#PrivateNetwork=true
+
+MemoryDenyWriteExecute=true
+
+UMask=0077
+
+
+[Install]
+WantedBy=multi-user.target
+
