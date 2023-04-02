@@ -8,7 +8,8 @@ After=network.target postgresql.service
 User=metricsdb
 Group=metricsdb
 Type=notify
-ExecStart=/usr/local/bin/ttnmqtt2pg --systemd -c /usr/local/etc/ttnmqtt2pq.ini
+EnvironmentFile=-/etc/sysconfig/ttnmqtt2pg
+ExecStart=/usr/local/bin/ttnmqtt2pg --systemd -c /usr/local/etc/ttnmqtt2pq.ini $flags
 
 # Restart the service if it exited cleanly/dirty/because of a signal/timeout
 Restart=always
@@ -35,13 +36,53 @@ ProtectSystem=strict
 # Make /home|/root|/run/user inaccessible/empty
 ProtectHome=true
 
+ProtectHostname=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+# disallow reading/writing kernel ring buffer
+ProtectKernelLogs=true
+# disallow modifying control groups
+ProtectControlGroups=true
+
+ProtectProc=invisible
+# many services need to read _some_thing from /proc/ but this one doesn't
+ProcSubset=pid
+
+SystemCallArchitectures=native
 # does work:
-#SystemCallFilter=@system-service
-# more minimal set:
-SystemCallFilter=@basic-io @io-event @file-system @network-io @signal mprotect sysinfo ioctl uname arch_prctl prctl    pipe2 vfork wait4
-# NB: `pipe2 vfork wait4` is required to work around a regression in SQLalchemy 1.4.44
-#     cf. https://github.com/sqlalchemy/sqlalchemy/issues/8995
+SystemCallFilter=@system-service
+# deny-list, i.e. remove some of the @system-service elements
+SystemCallFilter=~@keyring @memlock @privileged @resources @setuid userfaultfd
+
+# python calls prctl
+SystemCallFilter=prctl
+
+SystemCallFilter=~@ipc
+
+# python-psycopg3
+SystemCallFilter=pipe2 memfd_create
+
+RemoveIPC=true
+# assign the empty set
+CapabilityBoundingSet=
+
+# we need a UDS to Postgres and IP to TTN ...
+#IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+RestrictNamespaces=true
+# kind of implied by User=/NoNewPrivileges= setting
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+# we need to contact ntfy ...
+#PrivateNetwork=true
+
+MemoryDenyWriteExecute=true
+
+UMask=0077
 
 
 [Install]
 WantedBy=multi-user.target
+
