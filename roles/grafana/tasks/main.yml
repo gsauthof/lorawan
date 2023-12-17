@@ -25,6 +25,32 @@
   tags: [grafana]
 
 
+- name: copy extra grafana selinux policy modules
+  copy:
+      src: selinux/
+      dest: /root/selinux-grafana/
+  register: sepol
+  tags: [selinux, grafanaselinux]
+
+- name: remove state files if policy changed
+  file:
+      state: absent
+      path: /root/grafana-selinux.loaded
+  when: sepol.changed
+  tags: [selinux, grafanaselinux]
+
+- name: load grafana extra selinux policy
+  shell:
+      cmd: |
+          set -eux
+          cd /root/selinux-grafana
+          make -f /usr/share/selinux/devel/Makefile grafanapostgres.pp
+          /usr/sbin/semodule -i grafanapostgres.pp
+          touch /root/grafana-selinux.loaded
+      creates: /root/grafana-selinux.loaded
+  tags: [selinux, grafanaselinux]
+
+
 - name: start and enable grafana
   systemd:
       state: started

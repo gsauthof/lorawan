@@ -1,0 +1,18 @@
+
+module grafanapostgres 1.0;
+
+require {
+	type postgresql_var_run_t;
+	type postgresql_t;
+	type grafana_t;
+	class sock_file write;
+	class unix_stream_socket connectto;
+}
+
+#============= grafana_t ==============
+
+#!!!! This avc can be allowed using the boolean 'daemons_enable_cluster_mode'
+# => really? even if that works, this boolean seems to be too broad ...
+
+allow grafana_t postgresql_t:unix_stream_socket connectto;
+allow grafana_t postgresql_var_run_t:sock_file write;
